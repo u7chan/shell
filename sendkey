@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -ea
+
+function show_error {
+  local arg1=$1
+  echo "Notfound container: '$arg1'"
+}
+
+function show_usage {
+  echo "Usage: $0 [<Argments>]"
+  echo ""
+  echo "Argments: "
+  echo "  [1]: CONTAINER_ID"
+  echo ""
+}
+
+readonly SSH_KEY_FILE=id_ed25519
+readonly DST_OS_USER=root
+readonly DEFAULT_DOCKER_SERVICE_NAME=playground
+
+readonly SSH_PRIVATEKEY_PATH=$HOME/.ssh/$SSH_KEY_FILE
+readonly DEFAULT_DST_PATH=/$DST_OS_USER/.ssh/id_rsa
+readonly DEFAULT_CONTAINER_ID=$(docker ps | grep $DEFAULT_DOCKER_SERVICE_NAME | awk '{print $1}')
+
+container_id=$1
+container_id=$(docker ps | grep "^$container_id " | awk '{print $1}')
+
+if [ -z "$container_id" ] && [ -n "$DEFAULT_CONTAINER_ID" ] ; then
+  # コマンドの引数が未指定の場合は、デフォルト値からコンテナIDを検索し抽出する
+  container_id=$DEFAULT_CONTAINER_ID
+fi
+
+if [ -z "$container_id" ] && [ -z "$1" ] ; then
+  # デフォルト値でコンテナIDが見つけられなくて、更にコマンドの引数が未設定の場合
+  show_usage
+  exit 1
+fi
+
+if [ -z "$container_id" ] ; then
+  # 指定したコンテナIDが見つけられない場合
+  show_error
+  exit 1
+fi
+
+docker cp $SSH_PRIVATEKEY_PATH $container_id:$DEFAULT_DST_PATH
+docker exec $container_id chmod 600 $DEFAULT_DST_PATH
