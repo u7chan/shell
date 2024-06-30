@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ ! -f  ~/.ssh/id_ed25519.pub ]; then
+  ssh-keygen -t ed25519
+fi
+
+cat ~/.ssh/id_ed25519.pub
