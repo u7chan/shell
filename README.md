@@ -10,6 +10,7 @@
     ```sh
     cd shell
     ```
+
 1. パスの設定
 
     ```sh
@@ -26,7 +27,7 @@
 
     実行例
 
-    ```sh
+    ```
     $ hello
     hello shell
     ```
