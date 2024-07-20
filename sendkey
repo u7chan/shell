@@ -16,11 +16,11 @@ function show_usage {
 }
 
 readonly SSH_KEY_FILE=id_ed25519
-readonly DST_OS_USER=root
+readonly HOME_DIR=/home/vscode
 readonly DEFAULT_DOCKER_SERVICE_NAME=playground
 
 readonly SSH_PRIVATEKEY_PATH=$HOME/.ssh/$SSH_KEY_FILE
-readonly DEFAULT_DST_PATH=/$DST_OS_USER/.ssh/id_rsa
+readonly DEFAULT_DST_PATH=/$HOME_DIR/.ssh/id_rsa
 readonly DEFAULT_CONTAINER_ID=$(docker ps | grep $DEFAULT_DOCKER_SERVICE_NAME | awk '{print $1}')
 
 container_id=$1
