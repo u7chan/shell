@@ -20,7 +20,7 @@ readonly HOME_DIR=/home/vscode
 readonly DEFAULT_DOCKER_SERVICE_NAME=playground
 
 readonly SSH_PRIVATEKEY_PATH=$HOME/.ssh/$SSH_KEY_FILE
-readonly DEFAULT_DST_PATH=/$HOME_DIR/.ssh/id_rsa
+readonly DEFAULT_DST_PATH=$HOME_DIR/.ssh/id_rsa
 readonly DEFAULT_CONTAINER_ID=$(docker ps | grep $DEFAULT_DOCKER_SERVICE_NAME | awk '{print $1}')
 
 container_id=$1
