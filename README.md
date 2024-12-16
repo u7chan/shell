@@ -13,10 +13,20 @@
 
 1. パスの設定
 
+    ubuntu
+   
     ```sh
     touch ~/.bash_profile \
-    && echo 'export PATH=$PATH:'"$(pwd)" > ~/.bash_profile \
+    && echo 'export PATH=$PATH:'"$(pwd)" >> ~/.bash_profile \
     && source ~/.bash_profile
+    ```
+
+    mac
+
+    ```zsh
+    touch ~/.zprofile \
+    && echo 'export PATH=$PATH:'"$(pwd)" >> ~/.zprofile \
+    && source ~/.zprofile
     ```
 
 1. 新しくターミナルを起動し、以下のコマンドが通ることを確認
