@@ -1,0 +1,50 @@
+#!/bin/sh
+
+usage() {
+    echo "Usage: $0 <input_file> [output_width]"
+    echo "Convert an movie to GIF format."
+    echo ""
+    echo "Arguments:"
+    echo "    <input_file>   The input image file (supported formats: mp4, mov)."
+    echo "    [output_width] The width of the output GIF (default: 600)."
+    exit 1
+}
+
+# 引数のチェック
+if [ -z "$1" ]; then
+    echo '[!] Invalid argument: No input file provided.'
+    usage
+fi
+
+infile="$1"
+inwidth="$2"
+width="${inwidth:-600}" # 横幅のデフォルト値を600に設定
+
+# 入力ファイルの存在チェック
+if [ ! -f "$infile" ]; then
+    echo "[!] Error: Input file '$infile' does not exist."
+    usage
+fi
+
+# 拡張子の確認
+extension="${infile##*.}"
+if [ "$extension" != "mp4" ] && [ "$extension" != "mov" ]; then
+    echo "[!] Error: Unsupported file type. Please provide a .mp4 or .mov file."
+    usage
+fi
+
+# 出力ファイル名の設定
+outfile="${infile%.*}.gif"
+echo "[INFO] Converting: $infile => $outfile with width=$width"
+
+# 変換オプション
+fps=12 # フレームレート
+# 変換処理の実行
+ffmpeg -i "$infile" -an -r "$fps" -vf "scale=$width:-1" -pix_fmt rgb565 -f gif "$outfile"
+
+# 完了メッセージ
+if [ $? -eq 0 ]; then
+    echo "[INFO] Conversion completed successfully!"
+else
+    echo "[!] Error: Conversion failed."
+fi
