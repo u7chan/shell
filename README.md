@@ -1,43 +1,57 @@
-# shell
+# Shell
 
-カスタムシェル用のリポジトリ
+カスタムシェル用リポジトリ
 
-## セットアップ
+## セットアップ手順
 
-1. 本リポジトリをクローン
-1. リポジトリ配下へ移動
+以下の手順に従って、カスタムシェルをセットアップしてください。
+
+1. **リポジトリをクローン**
+
+    ```sh
+    git clone <リポジトリのURL>
+    ```
+
+2. **リポジトリディレクトリに移動**
 
     ```sh
     cd shell
     ```
 
-1. パスの設定
+3. **パスの設定**
 
-    ubuntu
-   
-    ```sh
-    touch ~/.bash_profile \
-    && echo 'export PATH=$PATH:'"$(pwd)" >> ~/.bash_profile \
-    && source ~/.bash_profile
-    ```
+    パスを設定することで、シェルコマンドをどこからでも実行できるようになります。使用しているOSに応じて、次のいずれかを実行してください。
 
-    mac
+    - **Ubuntu**
 
-    ```zsh
-    touch ~/.zprofile \
-    && echo 'export PATH=$PATH:'"$(pwd)" >> ~/.zprofile \
-    && source ~/.zprofile
-    ```
+        ```sh
+        echo 'export PATH=$PATH:'"$(pwd)" >> ~/.bash_profile
+        source ~/.bash_profile
+        ```
 
-1. 新しくターミナルを起動し、以下のコマンドが通ることを確認
+    - **macOS (Zsh)**
+
+        ```sh
+        echo 'export PATH=$PATH:'"$(pwd)" >> ~/.zprofile
+        source ~/.zprofile
+        ```
+
+4. **ターミナルを再起動し、コマンドを確認**
+
+    新しいターミナルを開いて、以下のコマンドを実行し、正しく動作するか確認してください。
 
     ```sh
     hello
     ```
 
-    実行例
+    **実行例:**
 
     ```
     $ hello
     hello shell
     ```
+
+## 注意事項
+
+- 環境変数の変更が正しく反映されるには、新しいターミナルウィンドウを開くか、`source`コマンドを使用して更新したプロファイルを再読み込みする必要があります。
+- `$(pwd)`により、現在のディレクトリのパスが環境変数に追加されます。これにより、シェルが期待通りに機能することが保証されます。
