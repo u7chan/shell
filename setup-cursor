@@ -1,0 +1,75 @@
+#!/bin/bash
+
+set -ea
+
+function show_usage {
+  echo "Usage: $0 [<Argments>]"
+  echo ""
+  echo "Argments: "
+  echo "  [1]: CONTAINER_ID"
+  echo "  [2]: CONTAINER_USER (vscode:default)"
+  echo ""
+}
+
+AUTH_JSON_PATH=~/.config/cursor/auth.json
+
+CONTAINER_ID=$1
+CONTAINER_USER="vscode"
+CONTAINER_HOME="/home/$CONTAINER_USER"
+
+if [ -z "$1" ]; then
+  show_usage
+  exit 1
+fi
+
+if [ -n "$2" ]; then
+  CONTAINER_USER=$2
+  if [ "$CONTAINER_USER" = "root" ]; then
+    CONTAINER_HOME="/root"
+  else
+    CONTAINER_HOME="/home/$CONTAINER_USER"
+  fi
+fi
+
+CONTAINER_CURSOR_CONFIG=$CONTAINER_HOME/.config/cursor
+
+set +e
+
+FIND_CONTAINER=$(docker ps | grep "^$CONTAINER_ID" | awk '{print $1}')
+FIND_IMAGE=$(docker ps | grep "^$CONTAINER_ID" | awk '{print $2}')
+
+set -e
+
+ERROR=0
+
+if [ -z "$FIND_CONTAINER" ]; then
+  FIND_CONTAINER="N/A"
+  FIND_IMAGE="N/A"
+  ERROR=1
+fi
+
+echo "CONTAINER_ID    : $FIND_CONTAINER"
+echo "CONTAINER_IMAGE : $FIND_IMAGE"
+echo "CONTAINER_USER  : $CONTAINER_USER"
+
+if [ "$ERROR" -eq 1 ]; then
+  exit 1
+fi
+
+if [ ! -f "$AUTH_JSON_PATH" ]; then
+  echo "Error: auth.json not found at $AUTH_JSON_PATH"
+  exit 1
+fi
+
+# Install Cursor CLI in container (as CONTAINER_USER)
+echo "Installing Cursor CLI..."
+docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl https://cursor.com/install -fsS | bash'
+docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc || echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.bashrc'
+
+# Inject credential
+echo "Injecting credential..."
+docker exec -u root "$CONTAINER_ID" mkdir -p "$CONTAINER_CURSOR_CONFIG"
+docker cp "$AUTH_JSON_PATH" "$CONTAINER_ID:$CONTAINER_CURSOR_CONFIG/auth.json"
+docker exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CURSOR_CONFIG/auth.json"
+
+echo "Done."
