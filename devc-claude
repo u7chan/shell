@@ -74,41 +74,73 @@ if [ ! -f "$CLAUDE_CONFIG_PATH" ]; then
   exit 1
 fi
 
-# Install Claude CLI in container (as CONTAINER_USER)
-# 
-# PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
-#   - Ubuntu/Debian: apt-get install ca-certificates
-#   - RHEL/CentOS: yum install ca-certificates
-#   - Alpine: apk add ca-certificates
-# 
-# 未インストールの場合、以下のエラーが発生します:
-#   curl: (xx) error setting certificate file: /etc/ssl/certs/ca-certificates.crt
-#
-echo "Installing Claude CLI..."
-$CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
-$CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc || echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
+# Check if Claude CLI is already installed
+CLAUDE_INSTALLED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/claude && echo "yes" || echo "no"' 2>/dev/null)
 
-# Inject credential
-echo "Injecting credential..."
-$CONTAINER_RUNTIME cp "$CLAUDE_CONFIG_PATH" "$CONTAINER_ID:$CONTAINER_CLAUDE_CONFIG_FILE"
-$CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
+# Install Claude CLI in container (as CONTAINER_USER)
+# PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
+if [ "$CLAUDE_INSTALLED" = "yes" ]; then
+  echo "Claude CLI already installed, skipping..."
+else
+  echo "Installing Claude CLI..."
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
+fi
+
+# Check if PATH is already configured
+PATH_CONFIGURED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
+
+if [ "$PATH_CONFIGURED" = "yes" ]; then
+  echo "PATH already configured, skipping..."
+else
+  echo "Configuring PATH..."
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
+fi
+
+# Inject credential (check if file exists and has same content)
+NEED_COPY=true
+if $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" test -f "$CONTAINER_CLAUDE_CONFIG_FILE" 2>/dev/null; then
+  # Compare content using md5sum
+  HOST_MD5=$(md5sum "$CLAUDE_CONFIG_PATH" | awk '{print $1}')
+  CONTAINER_MD5=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "md5sum $CONTAINER_CLAUDE_CONFIG_FILE 2>/dev/null | awk '{print \$1}'")
+  if [ "$HOST_MD5" = "$CONTAINER_MD5" ]; then
+    echo "Credential already up to date, skipping..."
+    NEED_COPY=false
+  fi
+fi
+
+if [ "$NEED_COPY" = true ]; then
+  echo "Injecting credential..."
+  $CONTAINER_RUNTIME cp "$CLAUDE_CONFIG_PATH" "$CONTAINER_ID:$CONTAINER_CLAUDE_CONFIG_FILE"
+  $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
+fi
 
 # Copy skills directory (handle symlink)
 HOST_SKILLS_DIR="$HOME/.claude/skills"
 CONTAINER_CLAUDE_DIR="$CONTAINER_HOME/.claude"
 CONTAINER_SKILLS_DIR="$CONTAINER_CLAUDE_DIR/skills"
 
+# Resolve symlink if needed
 if [ -L "$HOST_SKILLS_DIR" ]; then
-  # It's a symlink - resolve to actual path
   REAL_SKILLS_DIR=$(readlink -f "$HOST_SKILLS_DIR")
-  echo "Skills is symlink, copying from $REAL_SKILLS_DIR..."
-  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
-  $CONTAINER_RUNTIME cp "$REAL_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
-elif [ -d "$HOST_SKILLS_DIR" ]; then
-  # Regular directory
-  echo "Copying skills directory..."
-  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
-  $CONTAINER_RUNTIME cp "$HOST_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+else
+  REAL_SKILLS_DIR="$HOST_SKILLS_DIR"
+fi
+
+if [ -d "$REAL_SKILLS_DIR" ]; then
+  # Check if skills directory already exists in container
+  SKILLS_EXIST=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "test -d $CONTAINER_SKILLS_DIR && echo 'yes' || echo 'no'" 2>/dev/null)
+
+  if [ "$SKILLS_EXIST" = "yes" ]; then
+    echo "Skills directory already exists, skipping..."
+  else
+    if [ -L "$HOST_SKILLS_DIR" ]; then
+      echo "Skills is symlink, copying from $REAL_SKILLS_DIR..."
+    else
+      echo "Copying skills directory..."
+    fi
+    $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
+    $CONTAINER_RUNTIME cp "$REAL_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+  fi
 fi
 
 echo "Done."
