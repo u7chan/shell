@@ -69,6 +69,15 @@ if [ ! -f "$CLAUDE_CONFIG_PATH" ]; then
 fi
 
 # Install Claude CLI in container (as CONTAINER_USER)
+# 
+# PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
+#   - Ubuntu/Debian: apt-get install ca-certificates
+#   - RHEL/CentOS: yum install ca-certificates
+#   - Alpine: apk add ca-certificates
+# 
+# 未インストールの場合、以下のエラーが発生します:
+#   curl: (xx) error setting certificate file: /etc/ssl/certs/ca-certificates.crt
+#
 echo "Installing Claude CLI..."
 $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
 $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc || echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
