@@ -93,4 +93,22 @@ echo "Injecting credential..."
 $CONTAINER_RUNTIME cp "$CLAUDE_CONFIG_PATH" "$CONTAINER_ID:$CONTAINER_CLAUDE_CONFIG_FILE"
 $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
 
+# Copy skills directory (handle symlink)
+HOST_SKILLS_DIR="$HOME/.claude/skills"
+CONTAINER_CLAUDE_DIR="$CONTAINER_HOME/.claude"
+CONTAINER_SKILLS_DIR="$CONTAINER_CLAUDE_DIR/skills"
+
+if [ -L "$HOST_SKILLS_DIR" ]; then
+  # It's a symlink - resolve to actual path
+  REAL_SKILLS_DIR=$(readlink -f "$HOST_SKILLS_DIR")
+  echo "Skills is symlink, copying from $REAL_SKILLS_DIR..."
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
+  $CONTAINER_RUNTIME cp "$REAL_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+elif [ -d "$HOST_SKILLS_DIR" ]; then
+  # Regular directory
+  echo "Copying skills directory..."
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
+  $CONTAINER_RUNTIME cp "$HOST_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+fi
+
 echo "Done."
