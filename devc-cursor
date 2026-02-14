@@ -8,6 +8,14 @@
 
 set -ea
 
+# Logging functions
+log_info() { echo "[INFO] $*"; }
+log_step() { echo "[STEP] $*"; }
+log_ok()   { echo "[OK]   $*"; }
+log_skip() { echo "[SKIP] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*" >&2; }
+
 function show_usage {
   echo "Usage: $0 [<Argments>]"
   echo ""
@@ -54,58 +62,59 @@ if [ -z "$FIND_CONTAINER" ]; then
   ERROR=1
 fi
 
-echo "CONTAINER_ID    : $FIND_CONTAINER"
-echo "CONTAINER_IMAGE : $FIND_IMAGE"
-echo "CONTAINER_USER  : $CONTAINER_USER"
+log_info "Target container: $FIND_CONTAINER ($FIND_IMAGE)"
+log_info "User: $CONTAINER_USER"
 
 if [ "$ERROR" -eq 1 ]; then
+  log_error "Container '$CONTAINER_ID' not found or not running"
   exit 1
 fi
 
 if [ ! -f "$AUTH_JSON_PATH" ]; then
-  echo "Error: auth.json not found at $AUTH_JSON_PATH"
+  log_error "auth.json not found at $AUTH_JSON_PATH"
   exit 1
 fi
 
-# Check if Cursor CLI is already installed
+log_step "Checking Cursor CLI installation..."
 CURSOR_INSTALLED=$(docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/cursor && echo "yes" || echo "no"' 2>/dev/null)
 
 # Install Cursor CLI in container (as CONTAINER_USER)
 # PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
 if [ "$CURSOR_INSTALLED" = "yes" ]; then
-  echo "Cursor CLI already installed, skipping..."
+  log_skip "Cursor CLI already installed"
 else
-  echo "Installing Cursor CLI..."
+  log_step "Installing Cursor CLI..."
   docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl https://cursor.com/install -fsS | bash'
+  log_ok "Cursor CLI installed"
 fi
 
-# Check if PATH is already configured
+log_step "Checking PATH configuration..."
 PATH_CONFIGURED=$(docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
 
 if [ "$PATH_CONFIGURED" = "yes" ]; then
-  echo "PATH already configured, skipping..."
+  log_skip "PATH already configured in ~/.bashrc"
 else
-  echo "Configuring PATH..."
   docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
+  log_ok "PATH configured in ~/.bashrc"
 fi
 
-# Inject credential (check if file exists and has same content)
+log_step "Checking credentials..."
 NEED_COPY=true
 if docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" test -f "$CONTAINER_CURSOR_CONFIG/auth.json" 2>/dev/null; then
   # Compare content using md5sum
   HOST_MD5=$(md5sum "$AUTH_JSON_PATH" | awk '{print $1}')
   CONTAINER_MD5=$(docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "md5sum $CONTAINER_CURSOR_CONFIG/auth.json 2>/dev/null | awk '{print \$1}'")
   if [ "$HOST_MD5" = "$CONTAINER_MD5" ]; then
-    echo "Credential already up to date, skipping..."
+    log_skip "Credentials are up to date"
     NEED_COPY=false
   fi
 fi
 
 if [ "$NEED_COPY" = true ]; then
-  echo "Injecting credential..."
   docker exec -u root "$CONTAINER_ID" mkdir -p "$CONTAINER_CURSOR_CONFIG"
   docker cp "$AUTH_JSON_PATH" "$CONTAINER_ID:$CONTAINER_CURSOR_CONFIG/auth.json"
   docker exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CURSOR_CONFIG/auth.json"
+  log_ok "Credentials injected"
 fi
 
-echo "Done."
+log_ok "All tasks completed successfully"

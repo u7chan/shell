@@ -8,6 +8,14 @@
 
 set -ea
 
+# Logging functions
+log_info() { echo "[INFO] $*"; }
+log_step() { echo "[STEP] $*"; }
+log_ok()   { echo "[OK]   $*"; }
+log_skip() { echo "[SKIP] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*" >&2; }
+
 function show_usage {
   echo "Usage: $0 [<Argments>]"
   echo ""
@@ -60,61 +68,62 @@ if [ -z "$FIND_CONTAINER" ]; then
   ERROR=1
 fi
 
-echo "CONTAINER_ID    : $FIND_CONTAINER"
-echo "CONTAINER_IMAGE : $FIND_IMAGE"
-echo "CONTAINER_USER  : $CONTAINER_USER"
-echo "CONTAINER_RUNTIME: $CONTAINER_RUNTIME"
+log_info "Target container: $FIND_CONTAINER ($FIND_IMAGE)"
+log_info "User: $CONTAINER_USER"
+log_info "Runtime: $CONTAINER_RUNTIME"
 
 if [ "$ERROR" -eq 1 ]; then
+  log_error "Container '$CONTAINER_ID' not found or not running"
   exit 1
 fi
 
 if [ ! -f "$CLAUDE_CONFIG_PATH" ]; then
-  echo "Error: Claude config file not found at $CLAUDE_CONFIG_PATH"
+  log_error "Claude config file not found at $CLAUDE_CONFIG_PATH"
   exit 1
 fi
 
-# Check if Claude CLI is already installed
+log_step "Checking Claude CLI installation..."
 CLAUDE_INSTALLED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/claude && echo "yes" || echo "no"' 2>/dev/null)
 
 # Install Claude CLI in container (as CONTAINER_USER)
 # PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
 if [ "$CLAUDE_INSTALLED" = "yes" ]; then
-  echo "Claude CLI already installed, skipping..."
+  log_skip "Claude CLI already installed"
 else
-  echo "Installing Claude CLI..."
+  log_step "Installing Claude CLI..."
   $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  log_ok "Claude CLI installed"
 fi
 
-# Check if PATH is already configured
+log_step "Checking PATH configuration..."
 PATH_CONFIGURED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
 
 if [ "$PATH_CONFIGURED" = "yes" ]; then
-  echo "PATH already configured, skipping..."
+  log_skip "PATH already configured in ~/.bashrc"
 else
-  echo "Configuring PATH..."
   $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
+  log_ok "PATH configured in ~/.bashrc"
 fi
 
-# Inject credential (check if file exists and has same content)
+log_step "Checking credentials..."
 NEED_COPY=true
 if $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" test -f "$CONTAINER_CLAUDE_CONFIG_FILE" 2>/dev/null; then
   # Compare content using md5sum
   HOST_MD5=$(md5sum "$CLAUDE_CONFIG_PATH" | awk '{print $1}')
   CONTAINER_MD5=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "md5sum $CONTAINER_CLAUDE_CONFIG_FILE 2>/dev/null | awk '{print \$1}'")
   if [ "$HOST_MD5" = "$CONTAINER_MD5" ]; then
-    echo "Credential already up to date, skipping..."
+    log_skip "Credentials are up to date"
     NEED_COPY=false
   fi
 fi
 
 if [ "$NEED_COPY" = true ]; then
-  echo "Injecting credential..."
   $CONTAINER_RUNTIME cp "$CLAUDE_CONFIG_PATH" "$CONTAINER_ID:$CONTAINER_CLAUDE_CONFIG_FILE"
   $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
+  log_ok "Credentials injected"
 fi
 
-# Copy skills directory (handle symlink)
+log_step "Checking skills directory..."
 HOST_SKILLS_DIR="$HOME/.claude/skills"
 CONTAINER_CLAUDE_DIR="$CONTAINER_HOME/.claude"
 CONTAINER_SKILLS_DIR="$CONTAINER_CLAUDE_DIR/skills"
@@ -131,16 +140,17 @@ if [ -d "$REAL_SKILLS_DIR" ]; then
   SKILLS_EXIST=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "test -d $CONTAINER_SKILLS_DIR && echo 'yes' || echo 'no'" 2>/dev/null)
 
   if [ "$SKILLS_EXIST" = "yes" ]; then
-    echo "Skills directory already exists, skipping..."
+    log_skip "Skills directory already exists"
   else
     if [ -L "$HOST_SKILLS_DIR" ]; then
-      echo "Skills is symlink, copying from $REAL_SKILLS_DIR..."
-    else
-      echo "Copying skills directory..."
+      log_info "Skills is symlink, copying from $REAL_SKILLS_DIR"
     fi
     $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
     $CONTAINER_RUNTIME cp "$REAL_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+    log_ok "Skills directory copied"
   fi
+else
+  log_skip "Skills directory not found on host"
 fi
 
-echo "Done."
+log_ok "All tasks completed successfully"

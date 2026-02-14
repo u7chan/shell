@@ -8,6 +8,14 @@
 
 set -ea
 
+# Logging functions
+log_info() { echo "[INFO] $*"; }
+log_step() { echo "[STEP] $*"; }
+log_ok()   { echo "[OK]   $*"; }
+log_skip() { echo "[SKIP] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*" >&2; }
+
 function show_usage {
   echo "Usage: $0 [<Argments>]"
   echo ""
@@ -57,27 +65,27 @@ if [ -z "$FIND_CONTAINER" ]; then
   ERROR=1
 fi
 
-echo "CONTAINER_ID     : $FIND_CONTAINER"
-echo "CONTAINER_IMAGE  : $FIND_IMAGE"
-echo "CONTAINER_USER   : $CONTAINER_USER"
-echo "CONTAINER_RUNTIME: $CONTAINER_RUNTIME"
+log_info "Target container: $FIND_CONTAINER ($FIND_IMAGE)"
+log_info "User: $CONTAINER_USER"
+log_info "Runtime: $CONTAINER_RUNTIME"
 
 if [ "$ERROR" -eq 1 ]; then
+  log_error "Container '$CONTAINER_ID' not found or not running"
   exit 1
 fi
 
 if [ ! -f "$BASHRC_LOCAL_PATH" ]; then
-  echo "Error: .bashrc.local not found at $BASHRC_LOCAL_PATH"
+  log_error ".bashrc.local not found at $BASHRC_LOCAL_PATH"
   exit 1
 fi
 
-# Copy .bashrc.local to container
-echo "Copying .bashrc.local to container..."
+log_step "Copying .bashrc.local to container..."
 $CONTAINER_RUNTIME cp "$BASHRC_LOCAL_PATH" "$CONTAINER_ID:$CONTAINER_HOME/.bashrc.local"
 $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_HOME/.bashrc.local"
+log_ok ".bashrc.local copied"
 
-# Add source directive to .bashrc if not already present
-echo "Adding source directive to ~/.bashrc..."
+log_step "Configuring ~/.bashrc..."
 $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q "\.bashrc\.local" ~/.bashrc || echo "[ -f ~/.bashrc.local ] && source ~/.bashrc.local" >> ~/.bashrc'
+log_ok "Source directive added to ~/.bashrc"
 
-echo "Done."
+log_ok "All tasks completed successfully"
