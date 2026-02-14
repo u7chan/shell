@@ -1,57 +1,70 @@
 # Shell
 
-カスタムシェル用リポジトリ
+カスタムシェルスクリプトの管理リポジトリ。
 
-## セットアップ手順
+## インストール
 
-以下の手順に従って、カスタムシェルをセットアップしてください。
+```sh
+git clone <リポジトリのURL>
+cd shell
+```
 
-1. **リポジトリをクローン**
+OSに応じてPATHを設定してください。
 
-    ```sh
-    git clone <リポジトリのURL>
-    ```
+**Ubuntu:**
 
-2. **リポジトリディレクトリに移動**
+```sh
+echo 'export PATH=$PATH:'"$(pwd)" >> ~/.bash_profile
+source ~/.bash_profile
+```
 
-    ```sh
-    cd shell
-    ```
+**macOS (Zsh):**
 
-3. **パスの設定**
+```sh
+echo 'export PATH=$PATH:'"$(pwd)" >> ~/.zprofile
+source ~/.zprofile
+```
 
-    パスを設定することで、シェルコマンドをどこからでも実行できるようになります。使用しているOSに応じて、次のいずれかを実行してください。
+## コマンド一覧
 
-    - **Ubuntu**
+```sh
+$ hello
+Available commands:
+- dcprune
+- devc-claude
+- devc-cursor
+- devc-share-bashrc
+- gif
+- sendkey
+```
 
-        ```sh
-        echo 'export PATH=$PATH:'"$(pwd)" >> ~/.bash_profile
-        source ~/.bash_profile
-        ```
+| コマンド | 説明 | 引数 |
+|----------|------|------|
+| `dcprune` | 未使用のDockerリソースを一括削除し、ネットワークのみを保持します。 | - |
+| `devc-claude <CONTAINER> [USER]` | DevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
+| `devc-cursor <CONTAINER> [USER]` | DevContainerにCursor CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
+| `devc-share-bashrc <CONTAINER> [USER]` | `.bashrc.local`をコンテナに共有 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
+| `gif <FILE> [WIDTH]` | 動画をGIFに変換 | `FILE`: mp4/movファイル<br>`WIDTH`: 幅（default: `600`） |
+| `sendkey <CONTAINER> [USER]` | SSH秘密鍵をコンテナに注入 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `root`） |
 
-    - **macOS (Zsh)**
+## 必要条件
 
-        ```sh
-        echo 'export PATH=$PATH:'"$(pwd)" >> ~/.zprofile
-        source ~/.zprofile
-        ```
+| コマンド | 必要なもの |
+|----------|-----------|
+| `dcprune`, `devc-*`, `sendkey` | Docker |
+| `gif` | ffmpeg |
 
-4. **ターミナルを再起動し、コマンドを確認**
+## 環境変数
 
-    新しいターミナルを開いて、以下のコマンドを実行し、正しく動作するか確認してください。
+| 変数 | 説明 | デフォルト |
+|------|------|------------|
+| `CONTAINER_RUNTIME` | コンテナランタイム | `docker` |
 
-    ```sh
-    hello
-    ```
+> [!NOTE]
+> `CONTAINER_RUNTIME`は、Docker互換のCLIを持つランタイム（Podmanなど）を使用する場合に設定してください。
 
-    **実行例:**
-
-    ```
-    $ hello
-    hello shell
-    ```
-
-## 注意事項
-
-- 環境変数の変更が正しく反映されるには、新しいターミナルウィンドウを開くか、`source`コマンドを使用して更新したプロファイルを再読み込みする必要があります。
-- `$(pwd)`により、現在のディレクトリのパスが環境変数に追加されます。これにより、シェルが期待通りに機能することが保証されます。
+```sh
+# Podmanを使用する例
+export CONTAINER_RUNTIME=podman
+devc-claude <CONTAINER_ID>
+```
