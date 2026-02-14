@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Share host's .bashrc.local with DevContainer.
+# Copies $HOME/.bashrc.local from host to container and adds source directive to ~/.bashrc
+#
+# Usage: devc-share-bashrc <CONTAINER_ID> [CONTAINER_USER] [BASHRC_LOCAL_PATH]
+#
+
+set -ea
+
+function show_usage {
+  echo "Usage: $0 [<Argments>]"
+  echo ""
+  echo "Argments: "
+  echo "  [1]: CONTAINER_ID"
+  echo "  [2]: CONTAINER_USER (vscode:default)"
+  echo "  [3]: BASHRC_LOCAL_PATH (~/.bashrc.local:default)"
+  echo ""
+}
+
+CONTAINER_ID=$1
+CONTAINER_USER="vscode"
+CONTAINER_HOME="/home/$CONTAINER_USER"
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-docker}
+BASHRC_LOCAL_PATH="$HOME/.bashrc.local"
+
+if [ -z "$1" ]; then
+  show_usage
+  exit 1
+fi
+
+if [ -n "$2" ]; then
+  CONTAINER_USER=$2
+  if [ "$CONTAINER_USER" = "root" ]; then
+    CONTAINER_HOME="/root"
+  else
+    CONTAINER_HOME="/home/$CONTAINER_USER"
+  fi
+fi
+
+if [ -n "$3" ]; then
+  BASHRC_LOCAL_PATH=$3
+fi
+
+set +e
+
+FIND_CONTAINER=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $1}')
+FIND_IMAGE=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $2}')
+
+set -e
+
+ERROR=0
+
+if [ -z "$FIND_CONTAINER" ]; then
+  FIND_CONTAINER="N/A"
+  FIND_IMAGE="N/A"
+  ERROR=1
+fi
+
+echo "CONTAINER_ID     : $FIND_CONTAINER"
+echo "CONTAINER_IMAGE  : $FIND_IMAGE"
+echo "CONTAINER_USER   : $CONTAINER_USER"
+echo "CONTAINER_RUNTIME: $CONTAINER_RUNTIME"
+
+if [ "$ERROR" -eq 1 ]; then
+  exit 1
+fi
+
+if [ ! -f "$BASHRC_LOCAL_PATH" ]; then
+  echo "Error: .bashrc.local not found at $BASHRC_LOCAL_PATH"
+  exit 1
+fi
+
+# Copy .bashrc.local to container
+echo "Copying .bashrc.local to container..."
+$CONTAINER_RUNTIME cp "$BASHRC_LOCAL_PATH" "$CONTAINER_ID:$CONTAINER_HOME/.bashrc.local"
+$CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_HOME/.bashrc.local"
+
+# Add source directive to .bashrc if not already present
+echo "Adding source directive to ~/.bashrc..."
+$CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q "\.bashrc\.local" ~/.bashrc || echo "[ -f ~/.bashrc.local ] && source ~/.bashrc.local" >> ~/.bashrc'
+
+echo "Done."
