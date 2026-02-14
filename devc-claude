@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Install Claude CLI into a DevContainer and inject host credentials.
+# Requires: docker (or $CONTAINER_RUNTIME), ca-certificates in container image
+#
+# Usage: devc-claude <CONTAINER_ID> [CONTAINER_USER] [JSON_PATH]
+#
 
 set -ea
 

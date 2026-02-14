@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Install Cursor CLI into a DevContainer and inject host credentials.
+# Requires: docker, ca-certificates in container image
+#
+# Usage: devc-cursor <CONTAINER_ID> [CONTAINER_USER]
+#
 
 set -ea
 
@@ -62,6 +68,15 @@ if [ ! -f "$AUTH_JSON_PATH" ]; then
 fi
 
 # Install Cursor CLI in container (as CONTAINER_USER)
+# 
+# PREREQUISITE: コンテナイメージに ca-certificates パッケージが必要です
+#   - Ubuntu/Debian: apt-get install ca-certificates
+#   - RHEL/CentOS: yum install ca-certificates
+#   - Alpine: apk add ca-certificates
+# 
+# 未インストールの場合、以下のエラーが発生します:
+#   curl: (xx) error setting certificate file: /etc/ssl/certs/ca-certificates.crt
+#
 echo "Installing Cursor CLI..."
 docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl https://cursor.com/install -fsS | bash'
 docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc || echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.bashrc'

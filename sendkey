@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Inject SSH private key into a DevContainer for git operations.
+# Requires: docker, ~/.ssh/id_ed25519 on host
+#
+# Usage: sendkey <CONTAINER_ID> [CONTAINER_USER]
+#
 
 set -ea
 
