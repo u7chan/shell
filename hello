@@ -1,4 +1,4 @@
 #!/bin/sh
 
 echo "Available commands:"
-ls -1 | grep -v '^hello$' | grep -v '^README.md$' | sed 's/^/- /'
+ls -1 "$(dirname "$0")" | grep -v '^hello$' | grep -v '^README.md$' | sed 's/^/- /'
