@@ -74,6 +74,18 @@ if [ "$ERROR" -eq 1 ]; then
   exit 1
 fi
 
+# Check if user exists in container
+log_step "Checking if user '$CONTAINER_USER' exists in container..."
+if ! $CONTAINER_RUNTIME exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
+  log_error "User '$CONTAINER_USER' does not exist in container '$CONTAINER_ID'"
+  log_info "Available users in container:"
+  $CONTAINER_RUNTIME exec "$CONTAINER_ID" cat /etc/passwd 2>/dev/null | cut -d: -f1 | sort | tr '\n' ' ' || echo "(unable to list users)"
+  echo ""
+  log_info "Please specify a valid user with: $0 <CONTAINER_ID> <CONTAINER_USER>"
+  exit 1
+fi
+log_ok "User '$CONTAINER_USER' exists"
+
 if [ ! -f "$BASHRC_LOCAL_PATH" ]; then
   log_error ".bashrc.local not found at $BASHRC_LOCAL_PATH"
   exit 1
