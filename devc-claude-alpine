@@ -1,0 +1,178 @@
+#!/bin/bash
+#
+# Install Claude CLI into an Alpine-based DevContainer and inject host credentials.
+# Requires: docker (or $CONTAINER_RUNTIME)
+#
+# Usage: devc-claude-alpine <CONTAINER_ID> [CONTAINER_USER] [JSON_PATH]
+#
+
+set -ea
+
+# Logging functions
+log_info() { echo "[INFO] $*"; }
+log_step() { echo "[STEP] $*"; }
+log_ok()   { echo "[OK]   $*"; }
+log_skip() { echo "[SKIP] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*" >&2; }
+
+function show_usage {
+  echo "Usage: $0 [<Arguments>]"
+  echo ""
+  echo "Arguments: "
+  echo "  [1]: CONTAINER_ID"
+  echo "  [2]: CONTAINER_USER (vscode:default)"
+  echo "  [3]: JSON_PATH (~/.claude.json:default)"
+  echo ""
+}
+
+CLAUDE_CONFIG_PATH="$HOME/.claude.json"
+
+CONTAINER_ID=$1
+CONTAINER_USER="vscode"
+CONTAINER_HOME="/home/$CONTAINER_USER"
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-docker}
+
+if [ -z "$1" ]; then
+  show_usage
+  exit 1
+fi
+
+if [ -n "$2" ]; then
+  CONTAINER_USER=$2
+  if [ "$CONTAINER_USER" = "root" ]; then
+    CONTAINER_HOME="/root"
+  else
+    CONTAINER_HOME="/home/$CONTAINER_USER"
+  fi
+fi
+
+if [ -n "$3" ]; then
+  CLAUDE_CONFIG_PATH=$3
+fi
+
+CONTAINER_CLAUDE_CONFIG_FILE=$CONTAINER_HOME/.claude.json
+
+set +e
+
+FIND_CONTAINER=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $1}')
+FIND_IMAGE=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $2}')
+
+set -e
+
+ERROR=0
+
+if [ -z "$FIND_CONTAINER" ]; then
+  FIND_CONTAINER="N/A"
+  FIND_IMAGE="N/A"
+  ERROR=1
+fi
+
+log_info "Target container: $FIND_CONTAINER ($FIND_IMAGE)"
+log_info "User: $CONTAINER_USER"
+  log_info "Runtime: $CONTAINER_RUNTIME"
+
+if [ "$ERROR" -eq 1 ]; then
+  log_error "Container '$CONTAINER_ID' not found or not running"
+  exit 1
+fi
+
+if [ ! -f "$CLAUDE_CONFIG_PATH" ]; then
+  log_error "Claude config file not found at $CLAUDE_CONFIG_PATH"
+  exit 1
+fi
+
+# Install required packages on Alpine (as root)
+log_step "Installing required packages on Alpine..."
+$CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" sh -c '
+  if ! command -v curl >/dev/null 2>&1; then
+    apk add --no-cache curl
+  fi
+  if ! command -v bash >/dev/null 2>&1; then
+    apk add --no-cache bash
+  fi
+  if ! command -v ca-certificates >/dev/null 2>&1; then
+    apk add --no-cache ca-certificates
+  fi
+  if ! command -v md5sum >/dev/null 2>&1; then
+    apk add --no-cache coreutils
+  fi
+' 2>/dev/null
+log_ok "Required packages installed/verified"
+
+log_step "Checking Claude CLI installation..."
+CLAUDE_INSTALLED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/claude && echo "yes" || echo "no"' 2>/dev/null)
+
+# Install Claude CLI in container (as CONTAINER_USER)
+if [ "$CLAUDE_INSTALLED" = "yes" ]; then
+  log_skip "Claude CLI already installed"
+else
+  log_step "Installing Claude CLI..."
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  log_ok "Claude CLI installed"
+fi
+
+log_step "Checking PATH configuration..."
+PATH_CONFIGURED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
+
+if [ "$PATH_CONFIGURED" = "yes" ]; then
+  log_skip "PATH already configured in ~/.bashrc"
+else
+  $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
+  log_ok "PATH configured in ~/.bashrc"
+fi
+
+log_step "Checking credentials..."
+NEED_COPY=true
+if $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" test -f "$CONTAINER_CLAUDE_CONFIG_FILE" 2>/dev/null; then
+  # Compare content using md5sum (coreutils version on Alpine)
+  HOST_MD5=$(md5sum "$CLAUDE_CONFIG_PATH" | awk '{print $1}')
+  CONTAINER_MD5=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "md5sum $CONTAINER_CLAUDE_CONFIG_FILE 2>/dev/null | awk '{print \$1}'")
+  if [ "$HOST_MD5" = "$CONTAINER_MD5" ]; then
+    log_skip "Credentials are up to date"
+    NEED_COPY=false
+  fi
+fi
+
+if [ "$NEED_COPY" = true ]; then
+  $CONTAINER_RUNTIME cp "$CLAUDE_CONFIG_PATH" "$CONTAINER_ID:$CONTAINER_CLAUDE_CONFIG_FILE"
+  $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
+  log_ok "Credentials injected"
+fi
+
+log_step "Checking skills directory..."
+HOST_SKILLS_DIR="$HOME/.claude/skills"
+CONTAINER_CLAUDE_DIR="$CONTAINER_HOME/.claude"
+CONTAINER_SKILLS_DIR="$CONTAINER_CLAUDE_DIR/skills"
+
+# Resolve symlink if needed (compatible with both GNU and BusyBox readlink)
+if [ -L "$HOST_SKILLS_DIR" ]; then
+  # Try readlink -f first, fall back to realpath or manual resolution
+  if command -v realpath >/dev/null 2>&1; then
+    REAL_SKILLS_DIR=$(realpath "$HOST_SKILLS_DIR")
+  else
+    REAL_SKILLS_DIR=$(readlink -f "$HOST_SKILLS_DIR" 2>/dev/null || readlink "$HOST_SKILLS_DIR")
+  fi
+else
+  REAL_SKILLS_DIR="$HOST_SKILLS_DIR"
+fi
+
+if [ -d "$REAL_SKILLS_DIR" ]; then
+  # Check if skills directory already exists in container
+  SKILLS_EXIST=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c "test -d $CONTAINER_SKILLS_DIR && echo 'yes' || echo 'no'" 2>/dev/null)
+
+  if [ "$SKILLS_EXIST" = "yes" ]; then
+    log_skip "Skills directory already exists"
+  else
+    if [ -L "$HOST_SKILLS_DIR" ]; then
+      log_info "Skills is symlink, copying from $REAL_SKILLS_DIR"
+    fi
+    $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" mkdir -p "$CONTAINER_CLAUDE_DIR"
+    $CONTAINER_RUNTIME cp "$REAL_SKILLS_DIR" "$CONTAINER_ID:$CONTAINER_SKILLS_DIR"
+    log_ok "Skills directory copied"
+  fi
+else
+  log_skip "Skills directory not found on host"
+fi
+
+log_ok "All tasks completed successfully"

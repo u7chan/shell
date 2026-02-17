@@ -32,6 +32,7 @@ $ hello
 Available commands:
 - dcprune
 - devc-claude
+- devc-claude-alpine
 - devc-cursor
 - devc-share-bashrc
 - gif
@@ -42,6 +43,7 @@ Available commands:
 |----------|------|------|
 | `dcprune` | 未使用のDockerリソースを一括削除し、ネットワークのみを保持します。 | - |
 | `devc-claude <CONTAINER> [USER]` | DevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
+| `devc-claude-alpine <CONTAINER> [USER]` | AlpineベースのDevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `devc-cursor <CONTAINER> [USER]` | DevContainerにCursor CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `devc-share-bashrc <CONTAINER> [USER]` | `.bashrc.local`をコンテナに共有 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `gif <FILE> [WIDTH]` | 動画をGIFに変換 | `FILE`: mp4/movファイル<br>`WIDTH`: 幅（default: `600`） |
