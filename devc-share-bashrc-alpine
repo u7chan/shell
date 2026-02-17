@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# Share host's .bashrc.local with Alpine-based DevContainer.
+# Copies $HOME/.bashrc.local from host to container and adds source directive to ~/.bashrc
+#
+# Usage: devc-share-bashrc-alpine <CONTAINER_ID> [CONTAINER_USER] [BASHRC_LOCAL_PATH]
+#
+
+set -ea
+
+# Logging functions
+log_info() { echo "[INFO] $*"; }
+log_step() { echo "[STEP] $*"; }
+log_ok()   { echo "[OK]   $*"; }
+log_skip() { echo "[SKIP] $*"; }
+log_warn() { echo "[WARN] $*"; }
+log_error() { echo "[ERROR] $*" >&2; }
+
+function show_usage {
+  echo "Usage: $0 [<Arguments>]"
+  echo ""
+  echo "Arguments: "
+  echo "  [1]: CONTAINER_ID"
+  echo "  [2]: CONTAINER_USER (vscode:default)"
+  echo "  [3]: BASHRC_LOCAL_PATH (~/.bashrc.local:default)"
+  echo ""
+}
+
+CONTAINER_ID=$1
+CONTAINER_USER="vscode"
+CONTAINER_HOME="/home/$CONTAINER_USER"
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-docker}
+BASHRC_LOCAL_PATH="$HOME/.bashrc.local"
+
+if [ -z "$1" ]; then
+  show_usage
+  exit 1
+fi
+
+if [ -n "$2" ]; then
+  CONTAINER_USER=$2
+  if [ "$CONTAINER_USER" = "root" ]; then
+    CONTAINER_HOME="/root"
+  else
+    CONTAINER_HOME="/home/$CONTAINER_USER"
+  fi
+fi
+
+if [ -n "$3" ]; then
+  BASHRC_LOCAL_PATH=$3
+fi
+
+set +e
+
+FIND_CONTAINER=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $1}')
+FIND_IMAGE=$($CONTAINER_RUNTIME ps | grep "^$CONTAINER_ID" | awk '{print $2}')
+
+set -e
+
+ERROR=0
+
+if [ -z "$FIND_CONTAINER" ]; then
+  FIND_CONTAINER="N/A"
+  FIND_IMAGE="N/A"
+  ERROR=1
+fi
+
+log_info "Target container: $FIND_CONTAINER ($FIND_IMAGE)"
+log_info "User: $CONTAINER_USER"
+log_info "Runtime: $CONTAINER_RUNTIME"
+
+if [ "$ERROR" -eq 1 ]; then
+  log_error "Container '$CONTAINER_ID' not found or not running"
+  exit 1
+fi
+
+# Check if user exists in container
+log_step "Checking if user '$CONTAINER_USER' exists in container..."
+if ! $CONTAINER_RUNTIME exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
+  log_error "User '$CONTAINER_USER' does not exist in container '$CONTAINER_ID'"
+  log_info "Available users in container:"
+  $CONTAINER_RUNTIME exec "$CONTAINER_ID" cat /etc/passwd 2>/dev/null | cut -d: -f1 | sort | tr '\n' ' ' || echo "(unable to list users)"
+  echo ""
+  log_info "Please specify a valid user with: $0 <CONTAINER_ID> <CONTAINER_USER>"
+  exit 1
+fi
+log_ok "User '$CONTAINER_USER' exists"
+
+# =============================================================================
+# Check host .bashrc.local file
+# =============================================================================
+
+if [ ! -f "$BASHRC_LOCAL_PATH" ]; then
+  log_error ".bashrc.local not found at $BASHRC_LOCAL_PATH"
+  exit 1
+fi
+
+# =============================================================================
+# Install required packages on Alpine
+# =============================================================================
+
+log_step "Installing required packages on Alpine..."
+$CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" sh -c '
+  if ! command -v bash >/dev/null 2>&1; then
+    apk add --no-cache bash
+  fi
+  if ! command -v ca-certificates >/dev/null 2>&1; then
+    apk add --no-cache ca-certificates
+  fi
+' 2>/dev/null
+log_ok "Required packages installed/verified"
+
+# =============================================================================
+# Copy .bashrc.local to container
+# =============================================================================
+
+log_step "Copying .bashrc.local to container..."
+$CONTAINER_RUNTIME cp "$BASHRC_LOCAL_PATH" "$CONTAINER_ID:$CONTAINER_HOME/.bashrc.local"
+$CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_HOME/.bashrc.local"
+log_ok ".bashrc.local copied"
+
+# =============================================================================
+# Configure ~/.bashrc
+# =============================================================================
+
+log_step "Configuring ~/.bashrc..."
+$CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q "\.bashrc\.local" ~/.bashrc || echo "[ -f ~/.bashrc.local ] && source ~/.bashrc.local" >> ~/.bashrc'
+log_ok "Source directive added to ~/.bashrc"
+
+log_ok "All tasks completed successfully"
