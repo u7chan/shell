@@ -86,15 +86,27 @@ if ! $CONTAINER_RUNTIME exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 
 fi
 log_ok "User '$CONTAINER_USER' exists"
 
+# =============================================================================
+# Check host .bashrc.local file
+# =============================================================================
+
 if [ ! -f "$BASHRC_LOCAL_PATH" ]; then
   log_error ".bashrc.local not found at $BASHRC_LOCAL_PATH"
   exit 1
 fi
 
+# =============================================================================
+# Copy .bashrc.local to container
+# =============================================================================
+
 log_step "Copying .bashrc.local to container..."
 $CONTAINER_RUNTIME cp "$BASHRC_LOCAL_PATH" "$CONTAINER_ID:$CONTAINER_HOME/.bashrc.local"
 $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_HOME/.bashrc.local"
 log_ok ".bashrc.local copied"
+
+# =============================================================================
+# Configure ~/.bashrc
+# =============================================================================
 
 log_step "Configuring ~/.bashrc..."
 $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q "\.bashrc\.local" ~/.bashrc || echo "[ -f ~/.bashrc.local ] && source ~/.bashrc.local" >> ~/.bashrc'

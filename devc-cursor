@@ -82,10 +82,18 @@ if ! docker exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
 fi
 log_ok "User '$CONTAINER_USER' exists"
 
+# =============================================================================
+# Check host credentials file
+# =============================================================================
+
 if [ ! -f "$AUTH_JSON_PATH" ]; then
   log_error "auth.json not found at $AUTH_JSON_PATH"
   exit 1
 fi
+
+# =============================================================================
+# Install Cursor CLI
+# =============================================================================
 
 log_step "Checking Cursor CLI installation..."
 CURSOR_INSTALLED=$(docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/cursor && echo "yes" || echo "no"' 2>/dev/null)
@@ -100,6 +108,10 @@ else
   log_ok "Cursor CLI installed"
 fi
 
+# =============================================================================
+# Configure PATH in ~/.bashrc
+# =============================================================================
+
 log_step "Checking PATH configuration..."
 PATH_CONFIGURED=$(docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
 
@@ -109,6 +121,10 @@ else
   docker exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
   log_ok "PATH configured in ~/.bashrc"
 fi
+
+# =============================================================================
+# Inject credentials into container
+# =============================================================================
 
 log_step "Checking credentials..."
 NEED_COPY=true
