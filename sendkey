@@ -78,6 +78,10 @@ if ! docker exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
 fi
 log_ok "User '$CONTAINER_USER' exists"
 
+# =============================================================================
+# Inject SSH key
+# =============================================================================
+
 log_step "Injecting SSH key..."
 docker cp $SSH_PRIVATEKEY_PATH $CONTAINER_ID:$CONTAINER_SSH_KEY_PATH
 docker exec -u root $CONTAINER_ID chmod 600 $CONTAINER_SSH_KEY_PATH

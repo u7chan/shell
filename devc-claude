@@ -89,10 +89,18 @@ if ! $CONTAINER_RUNTIME exec "$CONTAINER_ID" id -u "$CONTAINER_USER" >/dev/null 
 fi
 log_ok "User '$CONTAINER_USER' exists"
 
+# =============================================================================
+# Check host credentials file
+# =============================================================================
+
 if [ ! -f "$CLAUDE_CONFIG_PATH" ]; then
   log_error "Claude config file not found at $CLAUDE_CONFIG_PATH"
   exit 1
 fi
+
+# =============================================================================
+# Install Claude CLI
+# =============================================================================
 
 log_step "Checking Claude CLI installation..."
 CLAUDE_INSTALLED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'test -f ~/.local/bin/claude && echo "yes" || echo "no"' 2>/dev/null)
@@ -107,6 +115,10 @@ else
   log_ok "Claude CLI installed"
 fi
 
+# =============================================================================
+# Configure PATH in ~/.bashrc
+# =============================================================================
+
 log_step "Checking PATH configuration..."
 PATH_CONFIGURED=$($CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'grep -q ".local/bin" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"')
 
@@ -116,6 +128,10 @@ else
   $CONTAINER_RUNTIME exec -u "$CONTAINER_USER" "$CONTAINER_ID" bash -c 'echo '"'"'export PATH="$HOME/.local/bin:$PATH"'"'"' >> ~/.bashrc'
   log_ok "PATH configured in ~/.bashrc"
 fi
+
+# =============================================================================
+# Inject credentials into container
+# =============================================================================
 
 log_step "Checking credentials..."
 NEED_COPY=true
@@ -134,6 +150,10 @@ if [ "$NEED_COPY" = true ]; then
   $CONTAINER_RUNTIME exec -u root "$CONTAINER_ID" chown "$CONTAINER_USER:$CONTAINER_USER" "$CONTAINER_CLAUDE_CONFIG_FILE"
   log_ok "Credentials injected"
 fi
+
+# =============================================================================
+# Copy skills directory
+# =============================================================================
 
 log_step "Checking skills directory..."
 HOST_SKILLS_DIR="$HOME/.claude/skills"
