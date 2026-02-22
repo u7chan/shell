@@ -82,8 +82,16 @@ log_ok "User '$CONTAINER_USER' exists"
 # Inject SSH key
 # =============================================================================
 
-log_step "Injecting SSH key..."
+log_step "Creating .ssh directory..."
+docker exec -u root $CONTAINER_ID mkdir -p $CONTAINER_HOME/.ssh
+
+log_step "Copying SSH key..."
 docker cp $SSH_PRIVATEKEY_PATH $CONTAINER_ID:$CONTAINER_SSH_KEY_PATH
+
+log_step "Setting permissions..."
 docker exec -u root $CONTAINER_ID chmod 600 $CONTAINER_SSH_KEY_PATH
+
+log_step "Changing ownership..."
 docker exec -u root $CONTAINER_ID chown $CONTAINER_USER:$CONTAINER_USER $CONTAINER_SSH_KEY_PATH
+
 log_ok "SSH key injected to $CONTAINER_SSH_KEY_PATH"
