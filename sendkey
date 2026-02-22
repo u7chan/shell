@@ -41,7 +41,7 @@ if [ -n "$2" ]; then
   CONTAINER_HOME=/home/$CONTAINER_USER
 fi
 
-CONTAINER_SSH_KEY_PATH=$CONTAINER_HOME/.ssh/id_rsa
+CONTAINER_SSH_KEY_PATH=$CONTAINER_HOME/.ssh/id_ed25519
 
 set +e
 
