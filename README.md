@@ -30,22 +30,28 @@ source ~/.zprofile
 ```sh
 $ hello
 Available commands:
+- dcrm
 - dcprune
+- dcstop
 - devc-claude
 - devc-claude-alpine
 - devc-cursor
 - devc-share-bashrc
+- devc-share-bashrc-alpine
 - gif
 - sendkey
 ```
 
 | コマンド | 説明 | 引数 |
 |----------|------|------|
+| `dcrm` | 全Dockerコンテナを停止して削除 | - |
 | `dcprune` | 未使用のDockerリソースを一括削除し、ネットワークのみを保持します。 | - |
+| `dcstop` | 実行中の全Dockerコンテナを停止 | - |
 | `devc-claude <CONTAINER> [USER]` | DevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `devc-claude-alpine <CONTAINER> [USER]` | AlpineベースのDevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `devc-cursor <CONTAINER> [USER]` | DevContainerにCursor CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `devc-share-bashrc <CONTAINER> [USER]` | `.bashrc.local`をコンテナに共有 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
+| `devc-share-bashrc-alpine <CONTAINER> [USER]` | AlpineベースのDevContainerに`.bashrc.local`を共有 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
 | `gif <FILE> [WIDTH]` | 動画をGIFに変換 | `FILE`: mp4/movファイル<br>`WIDTH`: 幅（default: `600`） |
 | `sendkey <CONTAINER> [USER]` | SSH秘密鍵をコンテナに注入 | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `root`） |
 
@@ -53,7 +59,7 @@ Available commands:
 
 | コマンド | 必要なもの |
 |----------|-----------|
-| `dcprune`, `devc-*`, `sendkey` | Docker |
+| `dcrm`, `dcstop`, `dcprune`, `devc-*`, `sendkey` | Docker |
 | `gif` | ffmpeg |
 
 ## 環境変数
