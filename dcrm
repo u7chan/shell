@@ -26,9 +26,9 @@ if [ -z "$CONTAINERS" ]; then
 fi
 
 COUNT=$(echo "$CONTAINERS" | wc -l | tr -d ' ')
-log_info "Removing $COUNT container(s)..."
+log_info "Removing $COUNT container(s) and attached volumes..."
 
 # shellcheck disable=SC2086
-$CONTAINER_RUNTIME rm $CONTAINERS
+$CONTAINER_RUNTIME rm -v $CONTAINERS
 
-log_ok "All containers removed"
+log_ok "All containers and attached volumes removed"

@@ -44,7 +44,7 @@ Available commands:
 
 | コマンド | 説明 | 引数 |
 |----------|------|------|
-| `dcrm` | 全Dockerコンテナを停止して削除 | - |
+| `dcrm` | 全Dockerコンテナを停止して削除し、紐づくボリュームも削除 | - |
 | `dcprune` | 未使用のDockerリソースを一括削除し、ネットワークのみを保持します。 | - |
 | `dcstop` | 実行中の全Dockerコンテナを停止 | - |
 | `devc-claude <CONTAINER> [USER]` | DevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
