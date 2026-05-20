@@ -30,21 +30,14 @@ source ~/.zprofile
 ```sh
 $ hello
 Available commands:
-- dcrm
-- dcprune
-- dcstop
-- devc-claude
-- devc-claude-alpine
-- devc-cursor
-- devc-share-bashrc
-- devc-share-bashrc-alpine
-- gif
-- sendkey
+...
 ```
 
 | コマンド | 説明 | 引数 |
 |----------|------|------|
+| `dcps` | 全Dockerコンテナをコンパクト表示（STATUS/ID/NAMES/PORTS/IMAGE、STATUSはUP/EXITED等に短縮、PORTSはホスト側に公開されたポートのみ） | - |
 | `dcrm` | 全Dockerコンテナを停止して削除し、紐づくボリュームも削除 | - |
+| `dcvrm` | 使用中でない全Dockerボリュームを削除 | - |
 | `dcprune` | 未使用のDockerリソースを一括削除し、ネットワークのみを保持します。 | - |
 | `dcstop` | 実行中の全Dockerコンテナを停止 | - |
 | `devc-claude <CONTAINER> [USER]` | DevContainerにClaude CLIをインストール | `CONTAINER`: コンテナID<br>`USER`: ユーザー名（default: `vscode`） |
@@ -59,7 +52,7 @@ Available commands:
 
 | コマンド | 必要なもの |
 |----------|-----------|
-| `dcrm`, `dcstop`, `dcprune`, `devc-*`, `sendkey` | Docker |
+| `dcps`, `dcrm`, `dcvrm`, `dcstop`, `dcprune`, `devc-*`, `sendkey` | Docker |
 | `gif` | ffmpeg |
 
 ## 環境変数
