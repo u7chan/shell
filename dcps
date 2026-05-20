@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# List all Docker containers in a compact format with status and published ports.
+#
+
+set -eao pipefail
+
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-docker}
+
+ROWS=$($CONTAINER_RUNTIME ps -a --format "{{.Status}}|{{.ID}}|{{.Names}}|{{.Ports}}|{{.Image}}")
+
+{
+  echo "STATUS|CONTAINER ID|NAMES|PORTS|IMAGE"
+  if [ -n "$ROWS" ]; then
+    printf '%s\n' "$ROWS" | \
+    awk -F'|' -v OFS='|' '{
+      n = split($4, arr, ", ")
+      ports = ""
+      delete seen
+      for (i = 1; i <= n; i++) {
+        if (match(arr[i], /:[0-9]+->/)) {
+          p = substr(arr[i], RSTART + 1, RLENGTH - 3)
+          if (!seen[p]++) {
+            ports = (ports == "" ? p : ports "," p)
+          }
+        }
+      }
+      $4 = (ports == "" ? "-" : ports)
+
+      if      ($1 ~ /^Up/)         $1 = "UP"
+      else if ($1 ~ /^Exited/)     $1 = "EXITED"
+      else if ($1 ~ /^Created/)    $1 = "CREATED"
+      else if ($1 ~ /^Restarting/) $1 = "RESTARTING"
+      else if ($1 ~ /^Paused/)     $1 = "PAUSED"
+      else if ($1 ~ /^Dead/)       $1 = "DEAD"
+
+      print
+    }'
+  fi
+} | column -t -s '|'
